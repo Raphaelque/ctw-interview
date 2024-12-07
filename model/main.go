@@ -79,6 +79,10 @@ func migrateDB() error {
 	if err != nil {
 		return err
 	}
+	err = DB.AutoMigrate(&Task{})
+	if err != nil {
+		return err
+	}
 	common.SysLog("database migrated")
 	return err
 }

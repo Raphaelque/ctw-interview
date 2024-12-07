@@ -24,5 +24,6 @@ func SetApiRouter(router *gin.Engine) {
 	{
 		taskRouter.Use(middleware.JWTAuth())
 		taskRouter.POST("tasks", controller.Task)
+		taskRouter.GET("tasks/:id/download", controller.TaskDownload)
 	}
 }

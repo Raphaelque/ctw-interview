@@ -5,7 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
+	"strconv"
 
+	"ctw-interview/model"
+	"ctw-interview/response"
 	"github.com/gin-gonic/gin"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -17,6 +21,10 @@ const (
 	apiKey       = "sk-210aef40ac9144c78c7fe00975b57371"
 	translateURL = "https://api.deepseek.com/"
 )
+
+type taskResponse struct {
+	TaskId int64 `json:"task_id"`
+}
 
 func Task(c *gin.Context) {
 	// 读取上传的 JSON 文件
@@ -38,7 +46,16 @@ func Task(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
+	// 完成文件处理操作，开始将数据传库
+	task := model.Task{}
+	_, err = task.Save()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message": err.Error(),
+			"success": false,
+		})
+		return
+	}
 	// 获取源语言和目标语言
 	sourceLang := c.PostForm("source_lang")
 	targetLang := c.PostForm("target_lang")
@@ -56,9 +73,17 @@ func Task(c *gin.Context) {
 		return true
 	})
 
+	// 将翻译后的 JSON 写入输出文件
+	_ = os.WriteFile(strconv.FormatInt(task.Id, 10)+".json", inputJSON, 0644)
+
 	// 返回翻译后的 JSON 文件
-	c.Header("Content-Disposition", "attachment; filename=translated.json")
-	c.Data(http.StatusOK, "application/json", inputJSON)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "上传成功",
+		"success": true,
+		"data": taskResponse{
+			TaskId: task.Id,
+		},
+	})
 }
 
 type TranslationRequest struct {
@@ -116,7 +141,7 @@ func DoApiRequest(c *gin.Context, text string) (string, error) {
 	)
 	chatCompletion, err := client.Chat.Completions.New(c, openai.ChatCompletionNewParams{
 		Messages: openai.F([]openai.ChatCompletionMessageParamUnion{
-			openai.UserMessage("翻译全部：" + text),
+			openai.UserMessage("直接返回翻译结果:" + text),
 		}),
 		Model: openai.F("deepseek-chat"),
 	})
@@ -126,15 +151,42 @@ func DoApiRequest(c *gin.Context, text string) (string, error) {
 	return chatCompletion.Choices[0].Message.Content, err
 }
 
-//func doRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
-//	resp, err := GetHttpClient().Do(req)
-//	if err != nil {
-//		return nil, err
-//	}
-//	if resp == nil {
-//		return nil, errors.New("resp is nil")
-//	}
-//	_ = req.Body.Close()
-//	_ = c.Request.Body.Close()
-//	return resp, nil
-//}
+func TaskDownload(c *gin.Context) {
+	taskId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	task, err := model.GetTaskById(int64(taskId))
+	if err != nil {
+		response.FailWithMessage("task not found", c)
+		return
+	}
+
+	filePath := "./" + strconv.FormatInt(task.Id, 10) + ".json"
+	file, err := os.Open(filePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open file"})
+		return
+	}
+	defer file.Close()
+
+	// 获取文件信息
+	fileInfo, err := file.Stat()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get file info"})
+		return
+	}
+
+	// 设置响应头，指定文件名和内容类型
+	c.Header("Content-Disposition", "attachment; filename=data.json")
+	c.Header("Content-Type", "application/json")
+	c.Header("Content-Length", string(fileInfo.Size()))
+
+	// 将文件内容写入响应体
+	http.ServeContent(c.Writer, c.Request, fileInfo.Name(), fileInfo.ModTime(), file)
+}
