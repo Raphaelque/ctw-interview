@@ -1,86 +1,130 @@
 package controller
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 
+	"ctw-interview/common"
+	"ctw-interview/middleware"
 	"ctw-interview/model"
 	"github.com/gin-gonic/gin"
 )
 
+type registerRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+type registerResponse struct {
+	UserID   int64  `json:"userId"`
+	Username string `json:"username"`
+	Token    string `json:"token"`
+}
+
+func Register(c *gin.Context) {
+	var user registerRequest
+	err := json.NewDecoder(c.Request.Body).Decode(&user)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "参数错误",
+		})
+		return
+	}
+	// 检查户名是否已存在
+	exist, err := model.CheckUserNameExist(user.Username)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "DB操作失败",
+		})
+		common.SysError(fmt.Sprintf("CheckUserNameExist error: %v", err))
+		return
+	}
+	if exist {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "用户名已存在",
+		})
+		return
+	}
+	dbUser := model.User{
+		Username: user.Username,
+		Password: user.Password,
+	}
+	// 插入用户
+	err = dbUser.CreateUser()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "注册成功",
+	})
+	return
+}
+
+type loginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
 func Login(c *gin.Context) {
-	//if !common.PasswordLoginEnabled {
-	//	c.JSON(http.StatusOK, gin.H{
-	//		"message": "管理员关闭了密码登录",
-	//		"success": false,
-	//	})
-	//	return
-	//}
-	//var loginRequest LoginRequest
-	//err := json.NewDecoder(c.Request.Body).Decode(&loginRequest)
-	//if err != nil {
-	//	c.JSON(http.StatusOK, gin.H{
-	//		"message": "无效的参数",
-	//		"success": false,
-	//	})
-	//	fmt.Println("无效参数1")
-	//	return
-	//}
-	//username := loginRequest.Username
-	//password := loginRequest.Password
-	//if username == "" || password == "" {
-	//	c.JSON(http.StatusOK, gin.H{
-	//		"message": "无效的参数",
-	//		"success": false,
-	//	})
-	//	fmt.Println("无效参数2")
-	//	return
-	//}
-	//user := model.User{
-	//	Username: username,
-	//	Password: password,
-	//}
-	//err = user.ValidateAndFill()
-	//if err != nil {
-	//	c.JSON(http.StatusOK, gin.H{
-	//		"message": err.Error(),
-	//		"success": false,
-	//	})
-	//	fmt.Println("无效参数3")
-	//	return
-	//}
-	setupLogin(nil, c)
+	var req loginRequest
+	err := json.NewDecoder(c.Request.Body).Decode(&req)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "无效的参数",
+			"success": false,
+		})
+		return
+	}
+
+	user := &model.User{
+		Username: req.Username,
+		Password: req.Password,
+	}
+	dbUser, err := user.CheckUser()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message": err.Error(),
+			"success": false,
+		})
+		return
+	}
+
+	setupLogin(dbUser, c)
+}
+
+type loginResponse struct {
+	Token  string `json:"token"`
+	UserID int64  `json:"userId"`
 }
 
 func setupLogin(user *model.User, c *gin.Context) {
-	//session := sessions.Default(c)
-	//session.Set("id", user.Id)
-	//session.Set("username", user.Username)
-	//session.Set("role", user.Role)
-	//session.Set("status", user.Status)
-	//// raphael update 添加group进入session
-	//session.Set("group", user.Group)
-	//fmt.Printf("id: %v, username: %v, role: %v, status: %v\n", user.Id, user.Username, user.Role, user.Status)
-	//err := session.Save()
-	//if err != nil {
-	//	c.JSON(http.StatusOK, gin.H{
-	//		"message": "无法保存会话信息，请重试",
-	//		"success": false,
-	//	})
-	//	return
-	//}
-	//cleanUser := model.User{
-	//	Id:          user.Id,
-	//	Username:    user.Username,
-	//	Email:       user.Email,
-	//	DisplayName: user.DisplayName,
-	//	Role:        user.Role,
-	//	Status:      user.Status,
-	//	Group:       user.Group,
-	//	Amount:      user.Amount,
-	//}
+	// 生成token
+	jwtToken, err := middleware.GenerateToken(user.Id)
+	// 更新token
+	user.Token = jwtToken
+	user, err = user.Save()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message": err.Error(),
+			"success": false,
+		})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"message": "",
 		"success": true,
-		"data":    nil,
+		"data": loginResponse{
+			Token:  user.Token,
+			UserID: user.Id},
 	})
 }

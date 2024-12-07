@@ -16,6 +16,13 @@ func SetApiRouter(router *gin.Engine) {
 	// 用户
 	authRouter := apiRouter.Group("/auth")
 	{
-		authRouter.POST("/users", middleware.UserAuth(), controller.Login)
+		authRouter.POST("/users", controller.Register)
+		authRouter.POST("/login", controller.Login)
+
+	}
+	taskRouter := apiRouter.Group("/task")
+	{
+		taskRouter.Use(middleware.UserAuth())
+		taskRouter.POST("tasks", controller.Task)
 	}
 }
