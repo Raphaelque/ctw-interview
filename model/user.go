@@ -51,6 +51,16 @@ func (u *User) Save() (*User, error) {
 	return u, nil
 }
 
+func GetUserById(id int64) (*User, error) {
+	if id == 0 {
+		return nil, errors.New("id 为空！")
+	}
+	user := User{Id: id}
+	var err error = nil
+	err = DB.First(&user, "id = ?", id).Error
+	return &user, err
+}
+
 // CheckUser check password
 func (u *User) CheckUser() (*User, error) {
 	password := u.Password

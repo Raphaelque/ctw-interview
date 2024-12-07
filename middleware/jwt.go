@@ -11,12 +11,19 @@ import (
 var (
 	TokenInvalid = errors.New("Couldn't handle this token:")
 )
+var mySigningKey = []byte("ushjlwmwnwht")
 
 type JWT struct {
 	SigningKey []byte
 }
 
-var mySigningKey = []byte("ushjlwmwnwht")
+func NewJWT() *JWT {
+	return &JWT{
+		SigningKey: mySigningKey,
+	}
+}
+
+// TODO SigningKey 优化配置
 
 type UserClaims struct {
 	UserId int64

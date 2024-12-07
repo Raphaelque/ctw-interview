@@ -1,0 +1,16 @@
+{
+  "name": "John Doe",
+  "age": 30,
+  "isStudent": false,
+  "hobbies": ["reading", "traveling", "playing guitar"],
+  "address": {
+    "street": "123 Maple Street",
+    "city": "Anytown",
+    "state": "CA",
+    "zip": "12345"
+  },
+  "contact": {
+    "email": "john.doe@example.com",
+    "phone": "+1-555-123-4567"
+  }
+}

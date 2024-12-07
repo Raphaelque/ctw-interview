@@ -20,9 +20,9 @@ func SetApiRouter(router *gin.Engine) {
 		authRouter.POST("/login", controller.Login)
 
 	}
-	taskRouter := apiRouter.Group("/task")
+	taskRouter := apiRouter.Group("/")
 	{
-		taskRouter.Use(middleware.UserAuth())
+		taskRouter.Use(middleware.JWTAuth())
 		taskRouter.POST("tasks", controller.Task)
 	}
 }

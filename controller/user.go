@@ -107,6 +107,7 @@ type loginResponse struct {
 	UserID int64  `json:"userId"`
 }
 
+// setupLogin 生成token并更新token 拓展情况下优化token存储查询方式
 func setupLogin(user *model.User, c *gin.Context) {
 	// 生成token
 	jwtToken, err := middleware.GenerateToken(user.Id)
