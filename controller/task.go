@@ -89,42 +89,41 @@ func translateText(c *gin.Context, text, sourceLang, targetLang string) (string,
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
-	resp, err := DoApiRequest(c)
+	resp, err := DoApiRequest(c, text)
 	if err != nil {
 		return "", err
 	}
 	//defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
+	//body, err := io.ReadAll(resp.Body)
+	//if err != nil {
+	//	return "", err
+	//}
+	//
+	//var translationResponse TranslationResponse
+	//err = json.Unmarshal(body, &translationResponse)
+	//if err != nil {
+	//	return "", err
+	//}
 
-	var translationResponse TranslationResponse
-	err = json.Unmarshal(body, &translationResponse)
-	if err != nil {
-		return "", err
-	}
-
-	return translationResponse.TranslatedText, nil
+	return resp, nil
 }
 
-func DoApiRequest(c *gin.Context) (*http.Response, error) {
+func DoApiRequest(c *gin.Context, text string) (string, error) {
 	client := openai.NewClient(
 		option.WithAPIKey(apiKey), // defaults to os.LookupEnv("OPENAI_API_KEY")
 		option.WithBaseURL(translateURL),
 	)
 	chatCompletion, err := client.Chat.Completions.New(c, openai.ChatCompletionNewParams{
 		Messages: openai.F([]openai.ChatCompletionMessageParamUnion{
-			openai.UserMessage("Say this is a test"),
+			openai.UserMessage("翻译全部：" + text),
 		}),
 		Model: openai.F("deepseek-chat"),
 	})
 	if err != nil {
 		panic(err.Error())
 	}
-	println(chatCompletion.Choices[0].Message.Content)
-	return nil, err
+	return chatCompletion.Choices[0].Message.Content, err
 }
 
 //func doRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
@@ -138,9 +137,4 @@ func DoApiRequest(c *gin.Context) (*http.Response, error) {
 //	_ = req.Body.Close()
 //	_ = c.Request.Body.Close()
 //	return resp, nil
-//}
-
-//
-//func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
-//	return relaycommon.GetFullRequestURL("https://api.deepseek.com", "/translate", info.ChannelType), nil
 //}
